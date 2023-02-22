@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useContext, createContext } from 'react'
 import './App.css'
 
 const defaultMainMenus = [
@@ -23,11 +23,25 @@ const defaultMainMenus = [
   },
 ]
 
+type CartState = typeof defaultMainMenus
 type Food = typeof defaultMainMenus[number]['foods'][number]
 
-function App() {
-  const [mainMenus, setMainMenus] = useState(defaultMainMenus)
+type CartContextValue = {
+  mainMenus: CartState
+  setMainMenus: (mainMenus: CartState) => void
+}
 
+const CartContext = createContext<null | CartContextValue>(null)
+
+function CartPage(props: {
+  gotoCheckoutPage: () => void
+  gotoCartPage: () => void
+}) {
+  const cartContextValue = useContext(CartContext)
+  if (cartContextValue == null) {
+    throw new Error('missing <CartContext.Provider/> in the parent')
+  }
+  const { mainMenus, setMainMenus } = cartContextValue
   const [mainMenuName, setMainMenuName] = useState('Drink')
   const foods = mainMenus.find(menu => menu.name === mainMenuName)?.foods
 
@@ -57,6 +71,9 @@ function App() {
 
   return (
     <div>
+      <div>
+        <button onClick={props.gotoCheckoutPage}>Checkout</button>
+      </div>
       <h1>Category Menu</h1>
       <div className="cat-menu">
         {mainMenus.map(menu => (
@@ -96,8 +113,60 @@ function App() {
           </div>
         ))}
       </div>
+
+      <CheckoutPage gotoCartPage={props.gotoCartPage} />
     </div>
   )
 }
 
-export default App
+function CheckoutPage(props: { gotoCartPage: () => void }) {
+  const cartContextValue = useContext(CartContext)
+  if (cartContextValue == null) {
+    throw new Error('missing <CartContext.Provider/> in the parent')
+  }
+  const { mainMenus, setMainMenus } = cartContextValue
+  return (
+    <div>
+      <div>
+        <button onClick={props.gotoCartPage}>Cart</button>
+      </div>
+      <h1>Checkout Page</h1>
+      <ol>
+        {mainMenus.flatMap(menu =>
+          menu.foods
+            .filter(food => food.quantity > 0)
+            .map(food => (
+              <li key={food.id}>
+                {food.name} x {food.quantity}
+              </li>
+            )),
+        )}
+      </ol>
+    </div>
+  )
+}
+
+function App() {
+  const [page, setPage] = useState('Cart')
+  if (page == 'Cart') {
+    return (
+      <CartPage
+        gotoCheckoutPage={() => setPage('Checkout')}
+        gotoCartPage={() => setPage('Cart')}
+      />
+    )
+  }
+  if (page == 'Checkout') {
+    return <CheckoutPage gotoCartPage={() => setPage('Cart')} />
+  }
+  return <div>Unknown page: {page}</div>
+}
+
+export default () => {
+  const [mainMenus, setMainMenus] = useState(defaultMainMenus)
+  return (
+    <CartContext.Provider value={{ mainMenus, setMainMenus }}>
+      <App />
+    </CartContext.Provider>
+  )
+}
